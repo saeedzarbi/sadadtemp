@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>گزارش تست نفوذ و ارزیابی امنیتی - نسخه حرفه‌ای</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%);
+            color: #334155;
+        }
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+        .tab-button.active {
+            border-color: #0d9488;
+            background-color: #0d9488;
+            color: white;
+        }
+        .report-section {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            background-color: #ffffff;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        input, select, textarea {
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: #14b8a6;
+            box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.2);
+            outline: none;
+        }
+        .severity-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+        .severity-critical { background-color: #991b1b; color: white; }
+        .severity-high { background-color: #dc2626; color: white; }
+        .severity-medium { background-color: #f59e0b; color: white; }
+        .severity-low { background-color: #3b82f6; color: white; }
+        .severity-info { background-color: #64748b; color: white; }
+        
+        .cvss-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(to right, #3b82f6 0%, #f59e0b 50%, #dc2626 100%);
+            position: relative;
+        }
+        .cvss-indicator {
+            position: absolute;
+            top: -4px;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border: 3px solid #0d9488;
+            border-radius: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .logo-preview {
+            max-width: 200px;
+            max-height: 100px;
+            object-fit: contain;
+        }
+        
+        @media print {
+            body { margin: 0; padding: 0; background: white; }
+            .no-print { display: none !important; }
+            #print-area {
+                display: block !important;
+                position: static;
+                width: 100%;
+                padding: 20px;
+                font-size: 11pt;
+            }
+            .print-break-before { page-break-before: always; }
+            .print-break-after { page-break-after: always; }
+            .report-section { 
+                border: 1px solid #e2e8f0; 
+                padding: 1rem; 
+                margin-bottom: 2rem; 
+                box-shadow: none;
+                page-break-inside: avoid;
+            }
+            .vulnerability-card {
+                page-break-inside: avoid;
+            }
+            canvas { max-width: 100% !important; height: auto !important; }
+            .chart-container-print { width: 60% !important; margin: 0 auto; }
+            h1 { font-size: 24pt; }
+            h2 { font-size: 18pt; }
+            h3 { font-size: 14pt; }
+            .logo-preview { max-height: 80px; }
+        }
+        
+        .timeline-item {
+            position: relative;
+            padding-right: 2rem;
+            border-right: 2px solid #e2e8f0;
+        }
+        .timeline-item:last-child {
+            border-right: none;
+        }
+        .timeline-dot {
+            position: absolute;
+            right: -6px;
+            top: 0;
+            width: 12px;
+            height: 12px;
+            background: #0d9488;
+            border-radius: 50%;
+        }
+        
+        .vulnerability-card {
+            transition: all 0.3s ease;
+            border-right: 4px solid transparent;
+        }
+        .vulnerability-card:hover {
+            transform: translateX(-4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .vulnerability-card.critical { border-right-color: #991b1b; }
+        .vulnerability-card.high { border-right-color: #dc2626; }
+        .vulnerability-card.medium { border-right-color: #f59e0b; }
+        .vulnerability-card.low { border-right-color: #3b82f6; }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border: 2px solid #e2e8f0;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .stat-card:hover {
+            transform: translateY(-4px);
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div id="app" class="container mx-auto p-4 md:p-8">
+        
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 no-print">
+            <div class="flex items-center gap-4 mb-4 md:mb-0">
+                <div id="logo-display" class="hidden">
+                    <img id="logo-img" class="logo-preview" src="" alt="لوگو">
+                </div>
+                <h1 class="text-4xl font-bold text-slate-800">گزارش تست نفوذ حرفه‌ای</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="exportReportAsHTML()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-lg transition-all transform hover:scale-105">
+                    📥 دانلود HTML
+                </button>
+                <button onclick="prepareAndPrintReport()" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-6 rounded-lg shadow-lg transition-all transform hover:scale-105">
+                    🖨️ چاپ/PDF
+                </button>
+            </div>
+        </header>
+
+        <div class="bg-white rounded-xl shadow-xl p-4 mb-8 no-print">
+            <nav id="tabs" class="flex flex-wrap justify-center gap-2">
+                <button data-tab="tab-info" class="tab-button active font-semibold py-3 px-5 border-b-4 border-transparent rounded-t-lg">📋 اطلاعات کلی</button>
+                <button data-tab="tab-management" class="tab-button font-semibold py-3 px-5 border-b-4 border-transparent rounded-t-lg">👥 مدیریت پروژه</button>
+                <button data-tab="tab-summary" class="tab-button font-semibold py-3 px-5 border-b-4 border-transparent rounded-t-lg">📊 خلاصه مدیریتی</button>
+                <button data-tab="tab-assessment" class="tab-button font-semibold py-3 px-5 border-b-4 border-transparent rounded-t-lg">🔍 ارزیابی آسیب‌پذیری</button>
+                <button data-tab="tab-conclusion" class="tab-button font-semibold py-3 px-5 border-b-4 border-transparent rounded-t-lg">✅ نتیجه‌گیری</button>
+            </nav>
+        </div>
+        
+        <main id="tab-content" class="min-h-screen no-print">
+            <!-- Tab 1: General Info -->
+            <div id="tab-info" class="tab-pane active">
+                <div class="report-section">
+                    <h2 class="text-2xl font-bold text-white bg-gradient-to-r from-teal-700 to-teal-600 p-5 rounded-t-xl mb-6">📋 اطلاعات کلی پروژه</h2>
+                    <div class="p-6">
+                        <div class="mb-8 p-4 bg-blue-50 border-r-4 border-blue-500 rounded">
+                            <p class="text-slate-700">اطلاعات پایه‌ای پروژه و تست نفوذ را در این بخش وارد کنید.</p>
+                        </div>
+                        
+                        <!-- Logo Upload Section -->
+                        <div class="mb-8 p-6 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border-2 border-dashed border-slate-300">
+                            <h3 class="text-lg font-bold mb-4 text-slate-700">🖼️ لوگوی سازمان</h3>
+                            <div class="flex items-center gap-4">
+                                <input type="file" id="logoUpload" accept="image/*" class="hidden">
+                                <button onclick="document.getElementById('logoUpload').click()" class="bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg">
+                                    انتخاب فایل لوگو
+                                </button>
+                                <span id="logo-file-name" class="text-sm text-slate-600">فایلی انتخاب نشده</span>
+                                <button onclick="removeLogo()" id="remove-logo-btn" class="hidden bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg">
+                                    حذف لوگو
+                                </button>
+                            </div>
+                            <div id="logo-preview-container" class="mt-4 hidden">
+                                <img id="logo-preview" class="logo-preview border-2 border-slate-300 rounded-lg p-2" src="" alt="پیش‌نمایش لوگو">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="projectName" class="block mb-2 font-semibold text-slate-700">🎯 نام پروژه/سیستم</label>
+                                <input type="text" id="projectName" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="مثال: سامانه مدیریت مشتریان">
+                            </div>
+                            <div>
+                                <label for="companyName" class="block mb-2 font-semibold text-slate-700">🏢 نام سازمان</label>
+                                <input type="text" id="companyName" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="مثال: شرکت فناوری اطلاعات ایران">
+                            </div>
+                            <div>
+                                <label for="testDate" class="block mb-2 font-semibold text-slate-700">📅 بازه زمانی تست</label>
+                                <input type="text" id="testDate" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="مثال: 1403/08/01 تا 1403/08/15">
+                            </div>
+                            <div>
+                                <label for="reportDate" class="block mb-2 font-semibold text-slate-700">📅 تاریخ تهیه گزارش</label>
+                                <input type="text" id="reportDate" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="مثال: 1403/08/20">
+                            </div>
+                            <div>
+                                <label for="testType" class="block mb-2 font-semibold text-slate-700">🔐 نوع تست نفوذ</label>
+                                <select id="testType" class="w-full p-3 border-2 border-slate-300 rounded-lg bg-white">
+                                    <option value="Black Box">جعبه سیاه (Black Box) - بدون دانش قبلی</option>
+                                    <option value="Gray Box">جعبه خاکستری (Gray Box) - دانش محدود</option>
+                                    <option value="White Box">جعبه سفید (White Box) - دانش کامل</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="reportVersion" class="block mb-2 font-semibold text-slate-700">📄 نسخه گزارش</label>
+                                <input type="text" id="reportVersion" class="w-full p-3 border-2 border-slate-300 rounded-lg" value="1.0">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6">
+                            <label for="targetUrl" class="block mb-2 font-semibold text-slate-700">🌐 URL/IP هدف</label>
+                            <input type="text" id="targetUrl" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="مثال: https://example.com یا 192.168.1.100">
+                        </div>
+                        
+                        <div class="mt-6">
+                            <label for="scope" class="block mb-2 font-semibold text-slate-700">📦 محدوده تست (Scope)</label>
+                            <textarea id="scope" rows="4" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="محدوده تست را مشخص کنید: دامنه‌ها، زیردامنه‌ها، IP‌ها و..."></textarea>
+                        </div>
+                        
+                        <div class="mt-6">
+                            <label for="objectives" class="block mb-2 font-semibold text-slate-700">🎯 اهداف ارزیابی</label>
+                            <textarea id="objectives" rows="4" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="اهداف اصلی از انجام این ارزیابی را بنویسید..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Project Management -->
+            <div id="tab-management" class="tab-pane hidden">
+                <div class="report-section">
+                    <h2 class="text-2xl font-bold text-white bg-gradient-to-r from-purple-700 to-purple-600 p-5 rounded-t-xl mb-6">👥 مدیریت پروژه و تیم</h2>
+                    <div class="p-6">
+                        <div class="mb-8 p-4 bg-purple-50 border-r-4 border-purple-500 rounded">
+                            <p class="text-slate-700">اطلاعات تیم تست نفوذ و اطلاعات تماس را وارد کنید.</p>
+                        </div>
+                        
+                        <h3 class="text-xl font-bold mb-4 text-slate-700">تیم تست نفوذ</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            <div>
+                                <label for="leadTester" class="block mb-2 font-semibold text-slate-700">👨‍💻 تستر ارشد</label>
+                                <input type="text" id="leadTester" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="نام و نام خانوادگی">
+                            </div>
+                            <div>
+                                <label for="teamMembers" class="block mb-2 font-semibold text-slate-700">👥 اعضای تیم</label>
+                                <input type="text" id="teamMembers" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="نام اعضا (با کاما جدا شوند)">
+                            </div>
+                        </div>
+                        
+                        <h3 class="text-xl font-bold mb-4 text-slate-700">اطلاعات تماس</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            <div>
+                                <label for="contactEmail" class="block mb-2 font-semibold text-slate-700">📧 ایمیل تماس</label>
+                                <input type="email" id="contactEmail" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="example@company.com">
+                            </div>
+                            <div>
+                                <label for="contactPhone" class="block mb-2 font-semibold text-slate-700">📞 تلفن تماس</label>
+                                <input type="text" id="contactPhone" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="021-12345678">
+                            </div>
+                        </div>
+                        
+                        <h3 class="text-xl font-bold mb-4 text-slate-700">متدولوژی و ابزارها</h3>
+                        <div class="mb-6">
+                            <label for="methodology" class="block mb-2 font-semibold text-slate-700">📚 متدولوژی استفاده شده</label>
+                            <textarea id="methodology" rows="3" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="مثال: OWASP Testing Guide v4.2, PTES, NIST SP 800-115"></textarea>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label for="toolsUsed" class="block mb-2 font-semibold text-slate-700">🛠️ ابزارهای استفاده شده</label>
+                            <textarea id="toolsUsed" rows="3" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="مثال: Burp Suite Pro, Nmap, Metasploit, SQLMap, OWASP ZAP"></textarea>
+                        </div>
+                        
+                        <h3 class="text-xl font-bold mb-4 text-slate-700">Timeline پروژه</h3>
+                        <div id="timeline-container" class="space-y-4">
+                            <div class="timeline-item pb-4">
+                                <div class="timeline-dot"></div>
+                                <div class="pr-6">
+                                    <input type="text" class="timeline-phase w-full p-2 border-2 border-slate-300 rounded-lg mb-2" placeholder="مرحله 1: جمع‌آوری اطلاعات" value="مرحله 1: جمع‌آوری اطلاعات">
+                                    <input type="text" class="timeline-date w-full p-2 border-2 border-slate-300 rounded-lg" placeholder="تاریخ">
+                                </div>
+                            </div>
+                            <div class="timeline-item pb-4">
+                                <div class="timeline-dot"></div>
+                                <div class="pr-6">
+                                    <input type="text" class="timeline-phase w-full p-2 border-2 border-slate-300 rounded-lg mb-2" placeholder="مرحله 2: شناسایی آسیب‌پذیری‌ها" value="مرحله 2: شناسایی آسیب‌پذیری‌ها">
+                                    <input type="text" class="timeline-date w-full p-2 border-2 border-slate-300 rounded-lg" placeholder="تاریخ">
+                                </div>
+                            </div>
+                            <div class="timeline-item pb-4">
+                                <div class="timeline-dot"></div>
+                                <div class="pr-6">
+                                    <input type="text" class="timeline-phase w-full p-2 border-2 border-slate-300 rounded-lg mb-2" placeholder="مرحله 3: بهره‌برداری (Exploitation)" value="مرحله 3: بهره‌برداری (Exploitation)">
+                                    <input type="text" class="timeline-date w-full p-2 border-2 border-slate-300 rounded-lg" placeholder="تاریخ">
+                                </div>
+                            </div>
+                            <div class="timeline-item pb-4">
+                                <div class="timeline-dot"></div>
+                                <div class="pr-6">
+                                    <input type="text" class="timeline-phase w-full p-2 border-2 border-slate-300 rounded-lg mb-2" placeholder="مرحله 4: تهیه گزارش" value="مرحله 4: تهیه گزارش">
+                                    <input type="text" class="timeline-date w-full p-2 border-2 border-slate-300 rounded-lg" placeholder="تاریخ">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Executive Summary (Dashboard) -->
+            <div id="tab-summary" class="tab-pane hidden">
+                <div class="report-section">
+                    <h2 class="text-2xl font-bold text-white bg-gradient-to-r from-indigo-700 to-indigo-600 p-5 rounded-t-xl mb-6">📊 خلاصه مدیریتی</h2>
+                    <div class="p-6">
+                        <!-- Stats Cards -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                            <div class="stat-card">
+                                <div class="text-3xl font-bold text-red-600" id="critical-count">0</div>
+                                <div class="text-sm text-slate-600 mt-1">بحرانی</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="text-3xl font-bold text-orange-600" id="high-count">0</div>
+                                <div class="text-sm text-slate-600 mt-1">بالا</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="text-3xl font-bold text-yellow-600" id="medium-count">0</div>
+                                <div class="text-sm text-slate-600 mt-1">متوسط</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="text-3xl font-bold text-blue-600" id="low-count">0</div>
+                                <div class="text-sm text-slate-600 mt-1">پایین</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Risk Level Badge -->
+                        <div class="mb-8 p-6 bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg border-2 border-slate-200">
+                            <h3 class="text-lg font-bold mb-3 text-slate-700">🎯 سطح ریسک کلی</h3>
+                            <div id="overall-risk-badge" class="inline-block text-2xl px-6 py-3 rounded-full font-bold">
+                                در انتظار ارزیابی
+                            </div>
+                        </div>
+                        
+                        <!-- Charts -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            <div class="bg-white p-4 rounded-lg border-2 border-slate-200">
+                                <h3 class="text-lg font-bold mb-4 text-center text-slate-700">توزیع آسیب‌پذیری‌ها بر اساس شدت</h3>
+                                <div class="chart-container-print">
+                                    <canvas id="severityChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="bg-white p-4 rounded-lg border-2 border-slate-200">
+                                <h3 class="text-lg font-bold mb-4 text-center text-slate-700">توزیع آسیب‌پذیری‌ها بر اساس دسته</h3>
+                                <div class="chart-container-print">
+                                    <canvas id="categoryChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Summary Text -->
+                        <div class="mt-6">
+                            <label for="executiveSummary" class="block mb-2 font-bold text-lg text-slate-700">📝 خلاصه اجرایی</label>
+                            <textarea id="executiveSummary" rows="6" class="w-full p-4 border-2 border-slate-300 rounded-lg" placeholder="خلاصه‌ای از یافته‌ها و توصیه‌های کلیدی برای مدیران..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: Vulnerability Assessment -->
+            <div id="tab-assessment" class="tab-pane hidden">
+                <div class="report-section">
+                    <h2 class="text-2xl font-bold text-white bg-gradient-to-r from-red-700 to-red-600 p-5 rounded-t-xl mb-6">🔍 ارزیابی آسیب‌پذیری‌ها</h2>
+                    <div class="p-6">
+                        <div class="mb-6 flex justify-between items-center">
+                            <p class="text-slate-700">آسیب‌پذیری‌های شناسایی شده را علامت‌گذاری و جزئیات آن‌ها را ثبت کنید.</p>
+                            <button id="addCustomFindingBtn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg">
+                                ➕ افزودن یافته سفارشی
+                            </button>
+                        </div>
+                        <div id="assessment-container"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 5: Conclusion -->
+            <div id="tab-conclusion" class="tab-pane hidden">
+                <div class="report-section">
+                    <h2 class="text-2xl font-bold text-white bg-gradient-to-r from-green-700 to-green-600 p-5 rounded-t-xl mb-6">✅ نتیجه‌گیری و توصیه‌ها</h2>
+                    <div class="p-6">
+                        <div class="mb-6">
+                            <label for="conclusion" class="block mb-2 font-bold text-lg text-slate-700">📋 نتیجه‌گیری کلی</label>
+                            <textarea id="conclusion" rows="6" class="w-full p-4 border-2 border-slate-300 rounded-lg" placeholder="نتیجه‌گیری کلی از ارزیابی امنیتی..."></textarea>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label for="recommendations" class="block mb-2 font-bold text-lg text-slate-700">💡 توصیه‌های اولویت‌دار</label>
+                            <textarea id="recommendations" rows="8" class="w-full p-4 border-2 border-slate-300 rounded-lg" placeholder="توصیه‌های اولویت‌دار برای رفع آسیب‌پذیری‌ها:
+1. رفع فوری آسیب‌پذیری‌های بحرانی
+2. ..."></textarea>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <label for="nextSteps" class="block mb-2 font-bold text-lg text-slate-700">🎯 مراحل بعدی</label>
+                            <textarea id="nextSteps" rows="4" class="w-full p-4 border-2 border-slate-300 rounded-lg" placeholder="برنامه پیگیری و تست مجدد..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for Vulnerability Details -->
+    <div id="findingModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 no-print" style="display: none;">
+        <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-gradient-to-r from-teal-700 to-teal-600 text-white p-6 rounded-t-xl">
+                <h3 class="text-2xl font-bold" id="modalTitle">جزئیات آسیب‌پذیری</h3>
+            </div>
+            <div class="p-6">
+                <input type="hidden" id="findingId">
+                
+                <div id="customTitleContainer" class="mb-6 hidden">
+                    <label for="findingTitleInput" class="block mb-2 font-bold text-slate-700">عنوان آسیب‌پذیری</label>
+                    <input type="text" id="findingTitleInput" class="w-full p-3 border-2 border-slate-300 rounded-lg">
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div>
+                        <label for="findingSeverity" class="block mb-2 font-bold text-slate-700">🔴 سطح خطر</label>
+                        <select id="findingSeverity" class="w-full p-3 border-2 border-slate-300 rounded-lg bg-white">
+                            <option value="Critical">بحرانی (Critical)</option>
+                            <option value="High">بالا (High)</option>
+                            <option value="Medium">متوسط (Medium)</option>
+                            <option value="Low">پایین (Low)</option>
+                            <option value="Informational">اطلاعاتی (Info)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="findingCWE" class="block mb-2 font-bold text-slate-700">🔢 CWE ID</label>
+                        <input type="text" id="findingCWE" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="مثال: CWE-79">
+                    </div>
+                    <div>
+                        <label for="findingCVSS" class="block mb-2 font-bold text-slate-700">📊 CVSS Score</label>
+                        <input type="number" id="findingCVSS" min="0" max="10" step="0.1" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="0.0 - 10.0">
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <div class="cvss-bar mb-2">
+                        <div id="cvss-indicator" class="cvss-indicator" style="left: 0%;"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-600">
+                        <span>0.0 (بدون خطر)</span>
+                        <span>5.0 (متوسط)</span>
+                        <span>10.0 (بحرانی)</span>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label for="findingDescription" class="block mb-2 font-bold text-slate-700">📝 توضیحات آسیب‌پذیری</label>
+                    <textarea id="findingDescription" rows="4" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="توضیحات کامل درباره آسیب‌پذیری..."></textarea>
+                </div>
+                
+                <div class="mb-6">
+                    <label for="findingPoc" class="block mb-2 font-bold text-slate-700">🧪 اثبات مفهوم (PoC)</label>
+                    <textarea id="findingPoc" rows="6" class="w-full p-3 border-2 border-slate-300 rounded-lg font-mono text-sm" placeholder="مراحل تکرار آسیب‌پذیری یا کد PoC..."></textarea>
+                </div>
+                
+                <div class="mb-6">
+                    <label for="findingImpact" class="block mb-2 font-bold text-slate-700">⚠️ تأثیرات احتمالی</label>
+                    <textarea id="findingImpact" rows="4" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="تأثیرات احتمالی این آسیب‌پذیری بر سیستم..."></textarea>
+                </div>
+                
+                <div class="mb-6">
+                    <label for="findingRemediation" class="block mb-2 font-bold text-slate-700">🔧 راهکار رفع</label>
+                    <textarea id="findingRemediation" rows="4" class="w-full p-3 border-2 border-slate-300 rounded-lg" placeholder="راهکارهای پیشنهادی برای رفع این آسیب‌پذیری..."></textarea>
+                </div>
+                
+                <div class="flex justify-end gap-3">
+                    <button id="cancelModalBtn" class="bg-slate-500 hover:bg-slate-600 text-white font-bold py-2 px-6 rounded-lg">
+                        انصراف
+                    </button>
+                    <button id="saveFindingBtn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-6 rounded-lg">
+                        ذخیره جزئیات
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Print Area -->
+    <div id="print-area" class="hidden"></div>
+
+    <script>
+        // Vulnerability Catalog based on OWASP Top 10 and common vulnerabilities
+        let vulnerabilityCatalog = {
+            "تزریق (Injection)": {
+                "SQL Injection": [
+                    { id: "sqli-1", title: "SQL Injection در فرم ورود", status: "pending", details: null, defaultSeverity: "Critical" },
+                    { id: "sqli-2", title: "Blind SQL Injection", status: "pending", details: null, defaultSeverity: "High" },
+                    { id: "sqli-3", title: "Time-based SQL Injection", status: "pending", details: null, defaultSeverity: "High" }
+                ],
+                "Command Injection": [
+                    { id: "cmdi-1", title: "OS Command Injection", status: "pending", details: null, defaultSeverity: "Critical" },
+                    { id: "cmdi-2", title: "Code Injection", status: "pending", details: null, defaultSeverity: "Critical" }
+                ],
+                "LDAP/NoSQL Injection": [
+                    { id: "nosql-1", title: "NoSQL Injection", status: "pending", details: null, defaultSeverity: "High" },
+                    { id: "ldap-1", title: "LDAP Injection", status: "pending", details: null, defaultSeverity: "High" }
+                ]
+            },
+            "احراز هویت و مدیریت نشست": {
+                "Authentication": [
+                    { id: "auth-1", title: "Weak Password Policy", status: "pending", details: null, defaultSeverity: "Medium" },
+                    { id: "auth-2", title: "Brute Force (عدم محدودیت تلاش)", status: "pending", details: null, defaultSeverity: "High" },
+                    { id: "auth-3", title: "Default Credentials", status: "pending", details: null, defaultSeverity: "Critical" },
+                    { id: "auth-4", title: "Missing Multi-Factor Authentication", status: "pending", details: null, defaultSeverity: "Medium" }
+                ],
+                "Session Management": [
+                    { id: "sess-1", title: "Session Fixation", status: "pending", details: null, defaultSeverity: "High" },
+                    { id: "sess-2", title: "Weak Session Tokens", status: "pending", details: null, defaultSeverity: "High" },
+                    { id: "sess-3", title: "Session Timeout نامناسب", status: "pending", details: null, defaultSeverity: "Medium" }
+                ]
+            },
+            "Cross-Site Scripting (XSS)": {
+                "XSS": [
+                    { id: "xss-1", title: "Reflected XSS", status: "pending", details: null, defaultSeverity: "High" },
+                    { id: "xss-2", title: "Stored XSS", status: "pending", details: null, defaultSeverity: "Critical" },
+                    { id: "xss-3", title: "DOM-based XSS", status: "pending", details: null, defaultSeverity: "High" }
+                ]
+            },
+            "کنترل دسترسی": {
+                "Access Control": [
+                    { id: "ac-1", title: "Insecure Direct Object Reference (IDOR)", status: "pending", details: null, defaultSeverity: "High" },
+                    { id: "ac-2", title: "Missing Function Level Access Control", status: "pending", details: null, defaultSeverity: "High" },
+                    { id: "ac-3", title: "Privilege Escalation", status: "pending", details: null, defaultSeverity: "Critical" },
+                    { id: "ac-4", title: "Path Traversal", status: "pending", details: null, defaultSeverity: "High" }
+                ]
+            },
+            "پیکربندی امنیتی": {
+                "Security Misconfiguration": [
+                    { id: "misc-1", title: "Directory Listing Enabled", status: "pending", details: null, defaultSeverity: "Low" },
+                    { id: "misc-2", title: "Verbose Error Messages", status: "pending", details: null, defaultSeverity: "Low" },
+                    { id: "misc-3", title: "Missing Security Headers", status: "pending", details: null, defaultSeverity: "Medium" },
+                    { id: "misc-4", title: "Outdated Software/Components", status: "pending", details: null, defaultSeverity: "Medium" }
+                ]
+            },
+            "افشای اطلاعات حساس": {
+                "Sensitive Data Exposure": [
+                    { id: "sde-1", title: "Sensitive Data in URL", status: "pending", details: null, defaultSeverity: "Medium" },
+                    { id: "sde-2", title: "Missing Encryption (HTTP instead of HTTPS)", status: "pending", details: null, defaultSeverity: "High" },
+                    { id: "sde-3", title: "Weak Cryptography", status: "pending", details: null, defaultSeverity: "High" },
+                    { id: "sde-4", title: "Information Disclosure", status: "pending", details: null, defaultSeverity: "Low" }
+                ]
+            },
+            "CSRF و یکپارچگی درخواست": {
+                "CSRF": [
+                    { id: "csrf-1", title: "Cross-Site Request Forgery (CSRF)", status: "pending", details: null, defaultSeverity: "High" },
+                    { id: "csrf-2", title: "Missing Anti-CSRF Tokens", status: "pending", details: null, defaultSeverity: "Medium" }
+                ]
+            },
+            "آپلود فایل": {
+                "File Upload": [
+                    { id: "upload-1", title: "Unrestricted File Upload", status: "pending", details: null, defaultSeverity: "Critical" },
+                    { id: "upload-2", title: "File Type Validation Bypass", status: "pending", details: null, defaultSeverity: "High" }
+                ]
+            },
+            "منطق کسب‌وکار": {
+                "Business Logic": [
+                    { id: "bl-1", title: "Business Logic Flaw", status: "pending", details: null, defaultSeverity: "High" },
+                    { id: "bl-2", title: "Race Condition", status: "pending", details: null, defaultSeverity: "Medium" }
+                ]
+            },
+            "یافته‌های سفارشی": {
+                "سفارشی": []
+            }
+        };
+
+        let customFindingCounter = 1;
+        let severityChart = null;
+        let categoryChart = null;
+        let logoDataUrl = null;
+
+        function findVulnerabilityById(id) {
+            for (const category in vulnerabilityCatalog) {
+                for (const subcat in vulnerabilityCatalog[category]) {
+                    const found = vulnerabilityCatalog[category][subcat].find(v => v.id === id);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+
+        function renderAssessmentList() {
+            const container = document.getElementById('assessment-container');
+            let html = '';
+            
+            for (const category in vulnerabilityCatalog) {
+                html += `<div class="mb-8">
+                    <h3 class="text-xl font-bold mb-4 text-slate-700 border-b-2 border-teal-600 pb-2">${category}</h3>`;
+                
+                for (const subcat in vulnerabilityCatalog[category]) {
+                    if (vulnerabilityCatalog[category][subcat].length === 0) continue;
+                    
+                    html += `<h4 class="text-lg font-semibold mb-3 text-slate-600">${subcat}</h4>
+                        <div class="space-y-3 mb-6">`;
+                    
+                    vulnerabilityCatalog[category][subcat].forEach(vuln => {
+                        const statusClass = vuln.status === 'found' ? 'bg-red-50 border-red-300' : 
+                                          vuln.status === 'pass' ? 'bg-green-50 border-green-300' : 
+                                          vuln.status === 'na' ? 'bg-gray-50 border-gray-300' : 
+                                          'bg-white border-slate-200';
+                        
+                        const severityBadge = vuln.details ? 
+                            `<span class="severity-badge severity-${vuln.details.severity.toLowerCase()}">${vuln.details.severity}</span>` : 
+                            `<span class="text-xs text-slate-500">${vuln.defaultSeverity}</span>`;
+                        
+                        html += `
+                            <div class="vulnerability-card p-4 border-2 ${statusClass} rounded-lg ${vuln.details ? vuln.details.severity.toLowerCase() : ''}">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div class="flex-1">
+                                        <div class="font-semibold text-slate-800">${vuln.title}</div>
+                                        <div class="text-xs text-slate-500 mt-1">ID: ${vuln.id}</div>
+                                        ${severityBadge}
+                                    </div>
+                                    <div class="flex gap-2">
+                                        ${vuln.status === 'pending' ? `
+                                            <button class="set-status-btn bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm" data-id="${vuln.id}" data-status="pass">✓ Pass</button>
+                                            <button class="set-status-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm" data-id="${vuln.id}" data-status="found">✗ یافت شد</button>
+                                            <button class="set-status-btn bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm" data-id="${vuln.id}" data-status="na">N/A</button>
+                                        ` : `
+                                            <button class="edit-details-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm" data-id="${vuln.id}">✏️ ویرایش</button>
+                                            <button class="reset-finding-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-sm" data-id="${vuln.id}">↻ ریست</button>
+                                        `}
+                                    </div>
+                                </div>
+                                ${vuln.details ? `
+                                    <div class="mt-3 pt-3 border-t border-slate-200 text-sm space-y-2">
+                                        ${vuln.details.cvss ? `<div><strong>CVSS:</strong> ${vuln.details.cvss}/10</div>` : ''}
+                                        ${vuln.details.cwe ? `<div><strong>CWE:</strong> ${vuln.details.cwe}</div>` : ''}
+                                        ${vuln.details.description ? `<div><strong>توضیحات:</strong> ${vuln.details.description.substring(0, 100)}...</div>` : ''}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    html += `</div>`;
+                }
+                html += `</div>`;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        function openModal(vulnerability, isCustom) {
+            const modal = document.getElementById('findingModal');
+            const titleContainer = document.getElementById('customTitleContainer');
+            
+            if (isCustom) {
+                titleContainer.classList.remove('hidden');
+                document.getElementById('modalTitle').textContent = vulnerability ? 'ویرایش یافته سفارشی' : 'افزودن یافته سفارشی';
+                const newId = vulnerability ? vulnerability.id : `custom_${customFindingCounter++}`;
+                document.getElementById('findingId').value = newId;
+                
+                if (vulnerability && vulnerability.details) {
+                    document.getElementById('findingTitleInput').value = vulnerability.title || '';
+                    document.getElementById('findingSeverity').value = vulnerability.details.severity || 'Medium';
+                    document.getElementById('findingCWE').value = vulnerability.details.cwe || '';
+                    document.getElementById('findingCVSS').value = vulnerability.details.cvss || '';
+                    document.getElementById('findingDescription').value = vulnerability.details.description || '';
+                    document.getElementById('findingPoc').value = vulnerability.details.poc || '';
+                    document.getElementById('findingImpact').value = vulnerability.details.impact || '';
+                    document.getElementById('findingRemediation').value = vulnerability.details.remediation || '';
+                } else {
+                    document.getElementById('findingTitleInput').value = '';
+                    document.getElementById('findingSeverity').value = 'Medium';
+                    document.getElementById('findingCWE').value = '';
+                    document.getElementById('findingCVSS').value = '';
+                    document.getElementById('findingDescription').value = '';
+                    document.getElementById('findingPoc').value = '';
+                    document.getElementById('findingImpact').value = '';
+                    document.getElementById('findingRemediation').value = '';
+                }
+            } else {
+                titleContainer.classList.add('hidden');
+                document.getElementById('modalTitle').textContent = vulnerability.title;
+                document.getElementById('findingId').value = vulnerability.id;
+                
+                if (vulnerability.details) {
+                    document.getElementById('findingSeverity').value = vulnerability.details.severity;
+                    document.getElementById('findingCWE').value = vulnerability.details.cwe || '';
+                    document.getElementById('findingCVSS').value = vulnerability.details.cvss || '';
+                    document.getElementById('findingDescription').value = vulnerability.details.description || '';
+                    document.getElementById('findingPoc').value = vulnerability.details.poc || '';
+                    document.getElementById('findingImpact').value = vulnerability.details.impact || '';
+                    document.getElementById('findingRemediation').value = vulnerability.details.remediation || '';
+                } else {
+                    document.getElementById('findingSeverity').value = vulnerability.defaultSeverity;
+                    document.getElementById('findingCWE').value = '';
+                    document.getElementById('findingCVSS').value = '';
+                    document.getElementById('findingDescription').value = '';
+                    document.getElementById('findingPoc').value = '';
+                    document.getElementById('findingImpact').value = '';
+                    document.getElementById('findingRemediation').value = '';
+                }
+            }
+            
+            updateCVSSIndicator();
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('findingModal').style.display = 'none';
+        }
+
+        function updateCVSSIndicator() {
+            const cvssValue = parseFloat(document.getElementById('findingCVSS').value) || 0;
+            const indicator = document.getElementById('cvss-indicator');
+            const percentage = (cvssValue / 10) * 100;
+            indicator.style.left = `${percentage}%`;
+        }
+
+        document.getElementById('findingCVSS').addEventListener('input', updateCVSSIndicator);
+
+        function updateDashboard() {
+            const stats = { Critical: 0, High: 0, Medium: 0, Low: 0, Informational: 0 };
+            const categories = {};
+            
+            for (const category in vulnerabilityCatalog) {
+                for (const subcat in vulnerabilityCatalog[category]) {
+                    vulnerabilityCatalog[category][subcat].forEach(vuln => {
+                        if (vuln.status === 'found' && vuln.details) {
+                            stats[vuln.details.severity]++;
+                            categories[category] = (categories[category] || 0) + 1;
+                        }
+                    });
+                }
+            }
+            
+            document.getElementById('critical-count').textContent = stats.Critical;
+            document.getElementById('high-count').textContent = stats.High;
+            document.getElementById('medium-count').textContent = stats.Medium;
+            document.getElementById('low-count').textContent = stats.Low;
+            
+            // Overall Risk Badge
+            const riskBadge = document.getElementById('overall-risk-badge');
+            if (stats.Critical > 0) {
+                riskBadge.textContent = '🔴 بحرانی (Critical)';
+                riskBadge.className = 'inline-block text-2xl px-6 py-3 rounded-full font-bold severity-critical';
+            } else if (stats.High > 0) {
+                riskBadge.textContent = '🟠 بالا (High)';
+                riskBadge.className = 'inline-block text-2xl px-6 py-3 rounded-full font-bold severity-high';
+            } else if (stats.Medium > 0) {
+                riskBadge.textContent = '🟡 متوسط (Medium)';
+                riskBadge.className = 'inline-block text-2xl px-6 py-3 rounded-full font-bold severity-medium';
+            } else if (stats.Low > 0) {
+                riskBadge.textContent = '🔵 پایین (Low)';
+                riskBadge.className = 'inline-block text-2xl px-6 py-3 rounded-full font-bold severity-low';
+            } else {
+                riskBadge.textContent = '✅ ایمن (در انتظار ارزیابی)';
+                riskBadge.className = 'inline-block text-2xl px-6 py-3 rounded-full font-bold bg-green-100 text-green-800';
+            }
+            
+            updateCharts(stats, categories);
+        }
+
+        function updateCharts(stats, categories) {
+            const severityCtx = document.getElementById('severityChart');
+            const categoryCtx = document.getElementById('categoryChart');
+            
+            if (severityChart) severityChart.destroy();
+            if (categoryChart) categoryChart.destroy();
+            
+            severityChart = new Chart(severityCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['بحرانی', 'بالا', 'متوسط', 'پایین', 'اطلاعاتی'],
+                    datasets: [{
+                        data: [stats.Critical, stats.High, stats.Medium, stats.Low, stats.Informational],
+                        backgroundColor: ['#991b1b', '#dc2626', '#f59e0b', '#3b82f6', '#64748b']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+            
+            categoryChart = new Chart(categoryCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(categories),
+                    datasets: [{
+                        label: 'تعداد آسیب‌پذیری',
+                        data: Object.values(categories),
+                        backgroundColor: '#0d9488'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // Logo Upload Handler
+        document.getElementById('logoUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    logoDataUrl = event.target.result;
+                    document.getElementById('logo-preview').src = logoDataUrl;
+                    document.getElementById('logo-img').src = logoDataUrl;
+                    document.getElementById('logo-preview-container').classList.remove('hidden');
+                    document.getElementById('logo-display').classList.remove('hidden');
+                    document.getElementById('logo-file-name').textContent = file.name;
+                    document.getElementById('remove-logo-btn').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function removeLogo() {
+            logoDataUrl = null;
+            document.getElementById('logo-preview').src = '';
+            document.getElementById('logo-img').src = '';
+            document.getElementById('logo-preview-container').classList.add('hidden');
+            document.getElementById('logo-display').classList.add('hidden');
+            document.getElementById('logoUpload').value = '';
+            document.getElementById('logo-file-name').textContent = 'فایلی انتخاب نشده';
+            document.getElementById('remove-logo-btn').classList.add('hidden');
+        }
+
+        function getReportHTMLContent() {
+            const projectName = document.getElementById('projectName').value || '[نام پروژه]';
+            const companyName = document.getElementById('companyName').value || '[نام سازمان]';
+            const testDate = document.getElementById('testDate').value || '[تاریخ تست]';
+            const reportDate = document.getElementById('reportDate').value || '[تاریخ گزارش]';
+            const testType = document.getElementById('testType').value;
+            const reportVersion = document.getElementById('reportVersion').value;
+            const targetUrl = document.getElementById('targetUrl').value || '[URL/IP]';
+            const scope = document.getElementById('scope').value || '';
+            const objectives = document.getElementById('objectives').value || '';
+            const leadTester = document.getElementById('leadTester').value || '';
+            const teamMembers = document.getElementById('teamMembers').value || '';
+            const contactEmail = document.getElementById('contactEmail').value || '';
+            const contactPhone = document.getElementById('contactPhone').value || '';
+            const methodology = document.getElementById('methodology').value || '';
+            const toolsUsed = document.getElementById('toolsUsed').value || '';
+            const executiveSummary = document.getElementById('executiveSummary').value || '';
+            const conclusion = document.getElementById('conclusion').value || '';
+            const recommendations = document.getElementById('recommendations').value || '';
+            const nextSteps = document.getElementById('nextSteps').value || '';
+            
+            const stats = { Critical: 0, High: 0, Medium: 0, Low: 0, Informational: 0 };
+            for (const category in vulnerabilityCatalog) {
+                for (const subcat in vulnerabilityCatalog[category]) {
+                    vulnerabilityCatalog[category][subcat].forEach(vuln => {
+                        if (vuln.status === 'found' && vuln.details) {
+                            stats[vuln.details.severity]++;
+                        }
+                    });
+                }
+            }
+            
+            let overallRisk = '✅ ایمن';
+            let riskClass = 'bg-green-100 text-green-800';
+            if (stats.Critical > 0) {
+                overallRisk = '🔴 بحرانی';
+                riskClass = 'severity-critical';
+            } else if (stats.High > 0) {
+                overallRisk = '🟠 بالا';
+                riskClass = 'severity-high';
+            } else if (stats.Medium > 0) {
+                overallRisk = '🟡 متوسط';
+                riskClass = 'severity-medium';
+            } else if (stats.Low > 0) {
+                overallRisk = '🔵 پایین';
+                riskClass = 'severity-low';
+            }
+            
+            const logoHtml = logoDataUrl ? `<img src="${logoDataUrl}" style="max-height: 80px; object-fit: contain;">` : '';
+            
+            let html = `
+                <!-- صفحه اول: جلد گزارش -->
+                <div style="text-align: center; padding: 4rem 2rem; background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%); color: white; border-radius: 1rem; margin-bottom: 2rem;">
+                    ${logoHtml ? `<div style="margin-bottom: 2rem;">${logoHtml}</div>` : ''}
+                    <h1 style="font-size: 2.5rem; font-weight: bold; margin-bottom: 1rem;">گزارش تست نفوذ و ارزیابی امنیتی</h1>
+                    <h2 style="font-size: 1.8rem; margin-bottom: 2rem;">${projectName}</h2>
+                    <div style="background: rgba(255,255,255,0.2); padding: 1.5rem; border-radius: 0.5rem; display: inline-block;">
+                        <p style="font-size: 1.2rem; margin: 0.5rem 0;"><strong>سازمان:</strong> ${companyName}</p>
+                        <p style="font-size: 1.2rem; margin: 0.5rem 0;"><strong>تاریخ تهیه:</strong> ${reportDate}</p>
+                        <p style="font-size: 1.2rem; margin: 0.5rem 0;"><strong>نسخه:</strong> ${reportVersion}</p>
+                    </div>
+                </div>
+                
+                <!-- اطلاعات کلی -->
+                <div style="page-break-before: always; background: white; padding: 2rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; margin-bottom: 2rem;">
+                    <h2 style="font-size: 1.8rem; font-weight: bold; color: #0d9488; border-bottom: 3px solid #0d9488; padding-bottom: 0.5rem; margin-bottom: 1.5rem;">📋 اطلاعات کلی</h2>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 1rem;">
+                        <tr><td style="padding: 0.75rem; border: 1px solid #e2e8f0; font-weight: bold; background: #f8fafc; width: 30%;">نام پروژه</td><td style="padding: 0.75rem; border: 1px solid #e2e8f0;">${projectName}</td></tr>
+                        <tr><td style="padding: 0.75rem; border: 1px solid #e2e8f0; font-weight: bold; background: #f8fafc;">سازمان</td><td style="padding: 0.75rem; border: 1px solid #e2e8f0;">${companyName}</td></tr>
+                        <tr><td style="padding: 0.75rem; border: 1px solid #e2e8f0; font-weight: bold; background: #f8fafc;">هدف تست</td><td style="padding: 0.75rem; border: 1px solid #e2e8f0;">${targetUrl}</td></tr>
+                        <tr><td style="padding: 0.75rem; border: 1px solid #e2e8f0; font-weight: bold; background: #f8fafc;">بازه تست</td><td style="padding: 0.75rem; border: 1px solid #e2e8f0;">${testDate}</td></tr>
+                        <tr><td style="padding: 0.75rem; border: 1px solid #e2e8f0; font-weight: bold; background: #f8fafc;">تاریخ گزارش</td><td style="padding: 0.75rem; border: 1px solid #e2e8f0;">${reportDate}</td></tr>
+                        <tr><td style="padding: 0.75rem; border: 1px solid #e2e8f0; font-weight: bold; background: #f8fafc;">نوع تست</td><td style="padding: 0.75rem; border: 1px solid #e2e8f0;">${testType}</td></tr>
+                        <tr><td style="padding: 0.75rem; border: 1px solid #e2e8f0; font-weight: bold; background: #f8fafc;">نسخه</td><td style="padding: 0.75rem; border: 1px solid #e2e8f0;">${reportVersion}</td></tr>
+                    </table>
+                    
+                    ${scope ? `<h3 style="font-size: 1.2rem; font-weight: bold; margin: 1.5rem 0 0.5rem;">محدوده تست:</h3><p style="white-space: pre-line; line-height: 1.6;">${scope}</p>` : ''}
+                    ${objectives ? `<h3 style="font-size: 1.2rem; font-weight: bold; margin: 1.5rem 0 0.5rem;">اهداف ارزیابی:</h3><p style="white-space: pre-line; line-height: 1.6;">${objectives}</p>` : ''}
+                </div>
+                
+                <!-- تیم و متدولوژی -->
+                <div style="background: white; padding: 2rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; margin-bottom: 2rem;">
+                    <h2 style="font-size: 1.8rem; font-weight: bold; color: #9333ea; border-bottom: 3px solid #9333ea; padding-bottom: 0.5rem; margin-bottom: 1.5rem;">👥 تیم و متدولوژی</h2>
+                    
+                    ${leadTester ? `<p style="margin-bottom: 0.5rem;"><strong>تستر ارشد:</strong> ${leadTester}</p>` : ''}
+                    ${teamMembers ? `<p style="margin-bottom: 0.5rem;"><strong>اعضای تیم:</strong> ${teamMembers}</p>` : ''}
+                    ${contactEmail ? `<p style="margin-bottom: 0.5rem;"><strong>ایمیل:</strong> ${contactEmail}</p>` : ''}
+                    ${contactPhone ? `<p style="margin-bottom: 1.5rem;"><strong>تلفن:</strong> ${contactPhone}</p>` : ''}
+                    
+                    ${methodology ? `<h3 style="font-size: 1.2rem; font-weight: bold; margin: 1rem 0 0.5rem;">متدولوژی:</h3><p style="white-space: pre-line; line-height: 1.6;">${methodology}</p>` : ''}
+                    ${toolsUsed ? `<h3 style="font-size: 1.2rem; font-weight: bold; margin: 1rem 0 0.5rem;">ابزارها:</h3><p style="white-space: pre-line; line-height: 1.6;">${toolsUsed}</p>` : ''}
+                </div>
+                
+                <!-- خلاصه مدیریتی -->
+                <div style="page-break-before: always; background: white; padding: 2rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; margin-bottom: 2rem;">
+                    <h2 style="font-size: 1.8rem; font-weight: bold; color: #4f46e5; border-bottom: 3px solid #4f46e5; padding-bottom: 0.5rem; margin-bottom: 1.5rem;">📊 خلاصه مدیریتی</h2>
+                    
+                    <div style="text-align: center; margin: 2rem 0;">
+                        <h3 style="font-size: 1.2rem; margin-bottom: 1rem;">سطح ریسک کلی</h3>
+                        <div style="display: inline-block; font-size: 1.5rem; padding: 1rem 2rem; border-radius: 2rem; font-weight: bold;" class="${riskClass}">${overallRisk}</div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 2rem 0;">
+                        <div style="text-align: center; padding: 1rem; background: #fee2e2; border-radius: 0.5rem; border: 2px solid #991b1b;">
+                            <div style="font-size: 2rem; font-weight: bold; color: #991b1b;">${stats.Critical}</div>
+                            <div style="font-size: 0.875rem; color: #7f1d1d;">بحرانی</div>
+                        </div>
+                        <div style="text-align: center; padding: 1rem; background: #fef3c7; border-radius: 0.5rem; border: 2px solid #dc2626;">
+                            <div style="font-size: 2rem; font-weight: bold; color: #dc2626;">${stats.High}</div>
+                            <div style="font-size: 0.875rem; color: #991b1b;">بالا</div>
+                        </div>
+                        <div style="text-align: center; padding: 1rem; background: #fef9c3; border-radius: 0.5rem; border: 2px solid #f59e0b;">
+                            <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">${stats.Medium}</div>
+                            <div style="font-size: 0.875rem; color: #78350f;">متوسط</div>
+                        </div>
+                        <div style="text-align: center; padding: 1rem; background: #dbeafe; border-radius: 0.5rem; border: 2px solid #3b82f6;">
+                            <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;">${stats.Low}</div>
+                            <div style="font-size: 0.875rem; color: #1e3a8a;">پایین</div>
+                        </div>
+                    </div>
+                    
+                    ${executiveSummary ? `<h3 style="font-size: 1.2rem; font-weight: bold; margin: 1.5rem 0 0.5rem;">خلاصه اجرایی:</h3><p style="white-space: pre-line; line-height: 1.8;">${executiveSummary}</p>` : ''}
+                </div>
+            `;
+            
+            // یافته‌های آسیب‌پذیری
+            let findingsHtml = '';
+            let findingNumber = 1;
+            
+            for (const category in vulnerabilityCatalog) {
+                for (const subcat in vulnerabilityCatalog[category]) {
+                    vulnerabilityCatalog[category][subcat].forEach(vuln => {
+                        if (vuln.status === 'found' && vuln.details) {
+                            const d = vuln.details;
+                            const severityColor = d.severity === 'Critical' ? '#991b1b' :
+                                                d.severity === 'High' ? '#dc2626' :
+                                                d.severity === 'Medium' ? '#f59e0b' :
+                                                d.severity === 'Low' ? '#3b82f6' : '#64748b';
+                            
+                            findingsHtml += `
+                                <div style="page-break-inside: avoid; background: white; padding: 1.5rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; border-right: 4px solid ${severityColor}; margin-bottom: 1.5rem;">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                                        <h3 style="font-size: 1.3rem; font-weight: bold; color: #1e293b; margin: 0;">یافته #${findingNumber}: ${vuln.title}</h3>
+                                        <span style="background-color: ${severityColor}; color: white; padding: 0.25rem 0.75rem; border-radius: 9999px; font-weight: 600; font-size: 0.75rem;">${d.severity}</span>
+                                    </div>
+                                    
+                                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem; padding: 1rem; background: #f8fafc; border-radius: 0.5rem;">
+                                        ${d.cwe ? `<div><strong style="color: #64748b;">CWE:</strong> ${d.cwe}</div>` : '<div></div>'}
+                                        ${d.cvss ? `<div><strong style="color: #64748b;">CVSS:</strong> ${d.cvss}/10</div>` : '<div></div>'}
+                                        <div><strong style="color: #64748b;">دسته:</strong> ${category}</div>
+                                    </div>
+                                    
+                                    ${d.description ? `
+                                        <div style="margin-bottom: 1rem;">
+                                            <h4 style="font-weight: bold; color: #475569; margin-bottom: 0.5rem;">📝 توضیحات:</h4>
+                                            <p style="white-space: pre-line; line-height: 1.6; color: #334155;">${d.description}</p>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${d.poc ? `
+                                        <div style="margin-bottom: 1rem;">
+                                            <h4 style="font-weight: bold; color: #475569; margin-bottom: 0.5rem;">🧪 اثبات مفهوم (PoC):</h4>
+                                            <pre style="background: #f1f5f9; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.875rem; color: #1e293b; border: 1px solid #cbd5e1;">${d.poc}</pre>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${d.impact ? `
+                                        <div style="margin-bottom: 1rem;">
+                                            <h4 style="font-weight: bold; color: #475569; margin-bottom: 0.5rem;">⚠️ تأثیرات احتمالی:</h4>
+                                            <p style="white-space: pre-line; line-height: 1.6; color: #334155;">${d.impact}</p>
+                                        </div>
+                                    ` : ''}
+                                    
+                                    ${d.remediation ? `
+                                        <div style="margin-bottom: 1rem;">
+                                            <h4 style="font-weight: bold; color: #475569; margin-bottom: 0.5rem;">🔧 راهکار رفع:</h4>
+                                            <p style="white-space: pre-line; line-height: 1.6; color: #334155; background: #ecfdf5; padding: 1rem; border-radius: 0.5rem; border-right: 3px solid #10b981;">${d.remediation}</p>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            `;
+                            findingNumber++;
+                        }
+                    });
+                }
+            }
+            
+            if (findingsHtml) {
+                html += `
+                    <div style="page-break-before: always; background: white; padding: 2rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; margin-bottom: 2rem;">
+                        <h2 style="font-size: 1.8rem; font-weight: bold; color: #dc2626; border-bottom: 3px solid #dc2626; padding-bottom: 0.5rem; margin-bottom: 1.5rem;">🔍 جزئیات آسیب‌پذیری‌های شناسایی شده</h2>
+                        ${findingsHtml}
+                    </div>
+                `;
+            }
+            
+            // نتیجه‌گیری
+            if (conclusion || recommendations || nextSteps) {
+                html += `
+                    <div style="page-break-before: always; background: white; padding: 2rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; margin-bottom: 2rem;">
+                        <h2 style="font-size: 1.8rem; font-weight: bold; color: #16a34a; border-bottom: 3px solid #16a34a; padding-bottom: 0.5rem; margin-bottom: 1.5rem;">✅ نتیجه‌گیری و توصیه‌ها</h2>
+                        
+                        ${conclusion ? `<h3 style="font-size: 1.2rem; font-weight: bold; margin: 1rem 0 0.5rem;">نتیجه‌گیری کلی:</h3><p style="white-space: pre-line; line-height: 1.8;">${conclusion}</p>` : ''}
+                        ${recommendations ? `<h3 style="font-size: 1.2rem; font-weight: bold; margin: 1.5rem 0 0.5rem;">توصیه‌های اولویت‌دار:</h3><p style="white-space: pre-line; line-height: 1.8;">${recommendations}</p>` : ''}
+                        ${nextSteps ? `<h3 style="font-size: 1.2rem; font-weight: bold; margin: 1.5rem 0 0.5rem;">مراحل بعدی:</h3><p style="white-space: pre-line; line-height: 1.8;">${nextSteps}</p>` : ''}
+                    </div>
+                `;
+            }
+            
+            return html;
+        }
+
+        function prepareAndPrintReport() {
+            const printArea = document.getElementById('print-area');
+            printArea.innerHTML = getReportHTMLContent();
+            printArea.classList.remove('hidden');
+            setTimeout(() => {
+                window.print();
+                printArea.classList.add('hidden');
+            }, 500);
+        }
+
+        function exportReportAsHTML() {
+            const reportContent = getReportHTMLContent();
+            const projectName = document.getElementById('projectName').value || "report";
+            const filename = `${projectName.replace(/ /g, '_')}_PenetrationTest_Report.html`;
+
+            const fullHtml = `
+                <!DOCTYPE html>
+                <html lang="fa" dir="rtl">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+                    <title>گزارش تست نفوذ: ${projectName}</title>
+                    <style>
+                        body { 
+                            font-family: 'Vazirmatn', sans-serif; 
+                            background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f2 100%); 
+                            color: #334155; 
+                            line-height: 1.6; 
+                            margin: 0 auto; 
+                            padding: 2rem; 
+                            max-width: 1200px; 
+                        }
+                        .severity-critical { background-color: #991b1b; color: white; }
+                        .severity-high { background-color: #dc2626; color: white; }
+                        .severity-medium { background-color: #f59e0b; color: white; }
+                        .severity-low { background-color: #3b82f6; color: white; }
+                        h1, h2, h3 { color: #1e293b; }
+                        table { border-collapse: collapse; width: 100%; }
+                        td { padding: 0.75rem; border: 1px solid #e2e8f0; }
+                    </style>
+                </head>
+                <body>
+                    ${reportContent}
+                </body>
+                </html>
+            `;
+
+            const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabs = document.querySelectorAll('.tab-button');
+            const tabPanes = document.querySelectorAll('.tab-pane');
+            const closeModalBtn = document.getElementById('closeModalBtn');
+            const cancelModalBtn = document.getElementById('cancelModalBtn');
+            const saveFindingBtn = document.getElementById('saveFindingBtn');
+            const assessmentContainer = document.getElementById('assessment-container');
+            const addCustomFindingBtn = document.getElementById('addCustomFindingBtn');
+
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    const target = tab.getAttribute('data-tab');
+                    tabPanes.forEach(pane => {
+                        if (pane.id === target) {
+                            pane.classList.remove('hidden');
+                            pane.classList.add('active');
+                        } else {
+                            pane.classList.add('hidden');
+                            pane.classList.remove('active');
+                        }
+                    });
+                    if (target === 'tab-summary') { updateDashboard(); }
+                });
+            });
+            
+            addCustomFindingBtn.addEventListener('click', () => openModal(null, true));
+            closeModalBtn.addEventListener('click', closeModal);
+            cancelModalBtn.addEventListener('click', closeModal);
+            
+            saveFindingBtn.addEventListener('click', () => {
+                const id = document.getElementById('findingId').value;
+                let vulnerability = findVulnerabilityById(id);
+                const details = { 
+                    severity: document.getElementById('findingSeverity').value, 
+                    cwe: document.getElementById('findingCWE').value, 
+                    cvss: document.getElementById('findingCVSS').value, 
+                    description: document.getElementById('findingDescription').value, 
+                    poc: document.getElementById('findingPoc').value, 
+                    impact: document.getElementById('findingImpact').value, 
+                    remediation: document.getElementById('findingRemediation').value 
+                };
+                
+                if (vulnerability) { 
+                    vulnerability.status = 'found';
+                    vulnerability.details = details;
+                    if(id.startsWith('custom_')) { 
+                        vulnerability.title = document.getElementById('findingTitleInput').value; 
+                    }
+                } else if (id.startsWith('custom_')) { 
+                    vulnerabilityCatalog["یافته‌های سفارشی"]["سفارشی"].push({ 
+                        id: id, 
+                        title: document.getElementById('findingTitleInput').value, 
+                        status: 'found', 
+                        details: details, 
+                        defaultSeverity: details.severity 
+                    });
+                }
+                
+                renderAssessmentList();
+                updateDashboard();
+                closeModal();
+            });
+
+            assessmentContainer.addEventListener('click', e => {
+                const button = e.target.closest('button');
+                if (!button) return;
+                const id = button.dataset.id;
+                const vulnerability = findVulnerabilityById(id);
+                if (!vulnerability) return;
+                
+                if (button.classList.contains('set-status-btn')) {
+                    const newStatus = button.dataset.status;
+                    if (newStatus === 'found') { 
+                        openModal(vulnerability, false); 
+                    } else { 
+                        vulnerability.status = newStatus; 
+                        vulnerability.details = null; 
+                        renderAssessmentList(); 
+                        updateDashboard(); 
+                    }
+                } else if (button.classList.contains('reset-finding-btn')) {
+                    vulnerability.status = 'pending'; 
+                    vulnerability.details = null; 
+                    renderAssessmentList(); 
+                    updateDashboard();
+                } else if (button.classList.contains('edit-details-btn')) {
+                    openModal(vulnerability, id.startsWith('custom_'));
+                }
+            });
+            
+            renderAssessmentList();
+            updateDashboard();
+        });
+    </script>
+</body>
+</html>
